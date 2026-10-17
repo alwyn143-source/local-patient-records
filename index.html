@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#145b52">
 <link rel="manifest" href="./manifest.webmanifest">
-<link rel="icon" href="./icons/icon-192.png" type="image/png">
 <title>Local Patient Records</title>
 <style>
 :root{--green:#145b52;--bg:#f3f7f6;--card:#fff;--text:#172b28;--muted:#5e716d;--line:#d9e5e2;--danger:#a32c2c}
@@ -123,9 +122,16 @@ const p={id:uid('PAT'),patientCode:customId||uid('P'),name,dob:$('pDob').value,s
 function showTab(id){document.querySelector(`[data-tab="${id}"]`).click()}
 $('search').addEventListener('input',renderPatients);
 function renderPatients(){const q=($('search').value||'').trim().toLowerCase(),list=data.patients.filter(p=>[p.name,p.patientCode,p.phone].some(v=>(v||'').toLowerCase().includes(q)));$('patientList').innerHTML=list.length?list.map(p=>`<div class="item"><div class="row" style="align-items:center"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.patientCode)} · ${esc(p.phone||'No phone')}</p></div><button class="secondary" data-open="${esc(p.id)}">Open record</button></div></div>`).join(''):'<div class="empty">No patients found. Add a patient to get started.</div>';document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{selectedId=b.dataset.open;renderDetail(selectedId)}));if(selectedId&&data.patients.some(p=>p.id===selectedId))renderDetail(selectedId)}
-function renderDetail(id){const p=data.patients.find(x=>x.id===id);if(!p){$('patientDetail').innerHTML='';return}const visits=data.visits.filter(v=>v.patientId===id).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));$('patientDetail').innerHTML=`<div class="card"><h2>${esc(p.name)}</h2><div class="tag">${esc(p.patientCode)}</div><p><b>DOB:</b> ${esc(fmtDate(p.dob))} · <b>Sex:</b> ${esc(p.sex||'Not recorded')}</p><p><b>Phone:</b> ${esc(p.phone||'Not recorded')}</p><p><b>Allergies / alerts:</b><br>${esc(p.allergies||'Not recorded').replace(/\\n/g,'<br>')}</p><p><b>Medical history:</b><br>${esc(p.history||'Not recorded').replace(/\\n/g,'<br>')}</p><div class="row"><button data-edit="${esc(p.id)}" class="secondary">Edit patient</button><button data-addvisit="${esc(p.id)}">Add visit</button></div><div id="editPatientForm" class="hidden"></div></div><div class="card"><h2>Visit history (${visits.length})</h2><div id="visitForm" class="hidden"></div>${visits.length?visits.map(v=>`<div class="item"><h3>${esc(fmtDate(v.date))}</h3><p><b>Diagnosis / reason:</b> ${esc(v.diagnosis||'Not recorded')}</p>${v.notes?`<p><b>Notes:</b> ${esc(v.notes)}</p>`:''}<h3>Medicines</h3>${v.medicines.length?v.medicines.map(m=>`<p><b>${esc(m.name)}</b>${m.strength?' · '+esc(m.strength):''}<br><span class="muted">${esc(m.dose||'Dose not recorded')} · ${esc(m.frequency||'Frequency not recorded')} · ${esc(m.duration||'Duration not recorded')}</span>${m.instructions?`<br>${esc(m.instructions)}`:''}</p>`).join(''):'<p class="muted">No medicines recorded.</p>'}<p class="muted small">Saved ${esc(new Date(v.createdAt).toLocaleString())}</p><button class="secondary" data-viewvisit="${esc(v.id)}">View / edit visit</button></div>`).join(''):'<div class="empty">No visits recorded yet.</div>'}</div>`;
+function renderDetail(id){const p=data.patients.find(x=>x.id===id);if(!p){$('patientDetail').innerHTML='';return}const visits=data.visits.filter(v=>v.patientId===id).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));$('patientDetail').innerHTML=`<div class="card"><h2>${esc(p.name)}</h2><div class="tag">${esc(p.patientCode)}</div><p><b>DOB:</b> ${esc(fmtDate(p.dob))} · <b>Sex:</b> ${esc(p.sex||'Not recorded')}</p><p><b>Phone:</b> ${esc(p.phone||'Not recorded')}</p><p><b>Allergies / alerts:</b><br>${esc(p.allergies||'Not recorded').replace(/\\n/g,'<br>')}</p><p><b>Medical history:</b><br>${esc(p.history||'Not recorded').replace(/\\n/g,'<br>')}</p><div class="row"><button data-edit="${esc(p.id)}" class="secondary">Edit patient</button><button data-addvisit="${esc(p.id)}">Add visit</button><button data-deletepatient="${esc(p.id)}" class="danger">Delete patient</button></div><div id="editPatientForm" class="hidden"></div></div><div class="card"><h2>Visit history (${visits.length})</h2><div id="visitForm" class="hidden"></div>${visits.length?visits.map(v=>`<div class="item"><h3>${esc(fmtDate(v.date))}</h3><p><b>Diagnosis / reason:</b> ${esc(v.diagnosis||'Not recorded')}</p>${v.notes?`<p><b>Notes:</b> ${esc(v.notes)}</p>`:''}<h3>Medicines</h3>${v.medicines.length?v.medicines.map(m=>`<p><b>${esc(m.name)}</b>${m.strength?' · '+esc(m.strength):''}<br><span class="muted">${esc(m.dose||'Dose not recorded')} · ${esc(m.frequency||'Frequency not recorded')} · ${esc(m.duration||'Duration not recorded')}</span>${m.instructions?`<br>${esc(m.instructions)}`:''}</p>`).join(''):'<p class="muted">No medicines recorded.</p>'}<p class="muted small">Saved ${esc(new Date(v.createdAt).toLocaleString())}</p><button class="secondary" data-viewvisit="${esc(v.id)}">View / edit visit</button></div>`).join(''):'<div class="empty">No visits recorded yet.</div>'}</div>`;
 document.querySelector('[data-addvisit]').addEventListener('click',()=>visitForm(id));
 document.querySelector('[data-edit]').addEventListener('click',()=>editPatient(id));
+document.querySelector('[data-deletepatient]').addEventListener('click',async()=>{
+ if(!confirm('Delete '+p.name+' and ALL associated visit history? This cannot be undone. Export an encrypted backup first if you may need these records.')) return;
+ const oldData=JSON.parse(JSON.stringify(data)), oldSelected=selectedId;
+ data.patients=data.patients.filter(x=>x.id!==id); data.visits=data.visits.filter(v=>v.patientId!==id); selectedId=null;
+ try { await persist(); $('patientDetail').innerHTML=''; renderPatients(); status('Patient and associated visit history deleted from this device.'); }
+ catch(e) { data=oldData; selectedId=oldSelected; renderPatients(); renderDetail(id); status('Delete failed; records were restored in memory: '+e.message,true); }
+});
 document.querySelectorAll('[data-viewvisit]').forEach(b=>b.addEventListener('click',()=>visitForm(id,b.dataset.viewvisit)));
 }
 function editPatient(id){const p=data.patients.find(x=>x.id===id),el=$('editPatientForm');el.classList.remove('hidden');el.innerHTML=`<hr><h3>Edit patient details</h3><label>Name *</label><input id="eName" value="${esc(p.name)}"><div class="grid"><div><label>Date of birth</label><input id="eDob" type="date" value="${esc(p.dob)}"></div><div><label>Sex</label><select id="eSex">${['','Female','Male','Other','Prefer not to say'].map(s=>`<option ${p.sex===s?'selected':''} value="${esc(s)}">${esc(s||'Not recorded')}</option>`).join('')}</select></div><div class="full"><label>Phone</label><input id="ePhone" value="${esc(p.phone)}"></div></div><label>Allergies / alerts</label><textarea id="eAllergies">${esc(p.allergies)}</textarea><label>Medical history</label><textarea id="eHistory">${esc(p.history)}</textarea><div class="row"><button id="saveEdit">Save changes</button><button id="cancelEdit" class="secondary">Cancel</button></div>`;$('cancelEdit').onclick=()=>el.classList.add('hidden');$('saveEdit').onclick=async()=>{if(!$('eName').value.trim()){status('Name is required.',true);return}Object.assign(p,{name:$('eName').value.trim(),dob:$('eDob').value,sex:$('eSex').value,phone:$('ePhone').value.trim(),allergies:$('eAllergies').value.trim(),history:$('eHistory').value.trim()});try{await persist();renderPatients();renderDetail(id);status('Patient details updated.')}catch(e){status('Could not save changes: '+e.message,true)}}}
@@ -136,16 +142,6 @@ $('lockBtn').addEventListener('click',()=>setUnlocked(false));
 if(!window.crypto||!crypto.subtle||!window.indexedDB){$('unlockBtn').disabled=true;status('This browser does not support required secure storage/encryption. Use an up-to-date Android browser.',true)}
 })();
 </script>
-
-<script>
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch((err) => {
-      console.warn('Offline app setup could not be completed:', err);
-    });
-  });
-}
-</script>
-
+<script>if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {})); }</script>
 </body>
 </html>
