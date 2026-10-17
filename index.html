@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#145b52">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<title>Local Patient Records</title>
+<style>
+:root{--green:#145b52;--bg:#f3f7f6;--card:#fff;--text:#172b28;--muted:#5e716d;--line:#d9e5e2;--danger:#a32c2c}
+*{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--green);color:white;padding:18px 16px 16px;position:sticky;top:0;z-index:5}header h1{font-size:21px;margin:0}header p{margin:4px 0 0;font-size:13px;opacity:.9}
+main{max-width:850px;margin:auto;padding:14px 12px 40px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px;margin:0 0 13px;box-shadow:0 2px 8px #153b3210}
+h2{font-size:18px;margin:0 0 12px}h3{font-size:16px;margin:12px 0 7px}label{display:block;font-size:13px;font-weight:650;color:var(--muted);margin:9px 0 4px}
+input,textarea,select{width:100%;padding:11px 12px;border:1px solid #b9cbc6;border-radius:9px;font:inherit;background:white;color:var(--text);min-height:44px}textarea{min-height:76px;resize:vertical}
+button{border:0;border-radius:9px;padding:11px 14px;font:600 14px system-ui;min-height:42px;background:var(--green);color:white;cursor:pointer}
+button.secondary{background:#e5efec;color:#164c44;border:1px solid #c5d9d3}button.danger{background:#fff0ef;color:var(--danger);border:1px solid #f0c6c3}button:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.full{grid-column:1/-1}
+.muted{color:var(--muted);font-size:13px}.small{font-size:12px}.hidden{display:none!important}.tabs{display:flex;gap:7px;margin-bottom:12px}.tabs button{flex:1}.tabs button.active{background:#fff;color:var(--green);border:1px solid var(--green)}
+.item{border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0;background:#fff}.item h3{margin:0 0 4px}.item p{margin:4px 0}.tag{display:inline-block;background:#e8f3f0;color:#18584e;padding:3px 7px;border-radius:20px;font-size:12px}
+.notice{background:#fff8e8;border:1px solid #f0d9a6;padding:11px;border-radius:10px;font-size:13px;margin-bottom:12px}
+#status{font-size:13px;margin:8px 0;color:var(--muted);overflow-wrap:anywhere}.error{color:var(--danger)}.empty{padding:20px;text-align:center;color:var(--muted)}
+hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+@media(max-width:480px){.grid{grid-template-columns:1fr}.full{grid-column:auto}.card{padding:13px}header{padding-top:14px}}
+</style>
+</head>
+<body>
+<header><h1>Local Patient Records</h1><p>Offline-first prototype · stored on this device</p></header>
+<main>
+<div id="lockScreen" class="card">
+  <h2>Unlock your records</h2>
+  <p class="muted">Create a strong app password the first time. It encrypts the database on this device and is also needed for encrypted backups.</p>
+  <label for="passphrase">App password</label><input id="passphrase" type="password" autocomplete="current-password" placeholder="Use a long, unique passphrase">
+  <div id="confirmWrap" class="hidden"><label for="confirmPass">Confirm app password</label><input id="confirmPass" type="password" autocomplete="new-password"></div>
+  <div class="row" style="margin-top:12px"><button id="unlockBtn">Create secure database</button></div>
+  <p class="muted small">If you forget this password and have no usable backup, your records cannot be recovered.</p>
+</div>
+<div id="app" class="hidden">
+  <div class="notice"><b>Prototype warning:</b> test with fictional patients first. This is not certified clinical software. Records are encrypted in this app's browser storage, but the phone's browser profile and device must also be secured.</div>
+  <div class="tabs">
+    <button class="active" data-tab="patientsTab">Patients</button>
+    <button class="secondary" data-tab="addTab">Add patient</button>
+    <button class="secondary" data-tab="backupTab">Backup</button>
+  </div>
+  <section id="patientsTab" class="tabPanel">
+    <div class="card">
+      <h2>Find a patient</h2>
+      <input id="search" placeholder="Search name, patient ID, or phone number" autocomplete="off">
+      <p class="muted">Choose a patient to view their visits and medicines.</p>
+      <div id="patientList"></div>
+    </div>
+    <div id="patientDetail"></div>
+  </section>
+  <section id="addTab" class="tabPanel hidden">
+    <div class="card">
+      <h2>Add patient</h2>
+      <form id="patientForm">
+        <label for="pName">Full name *</label><input id="pName" required maxlength="120">
+        <div class="grid">
+          <div><label for="pDob">Date of birth</label><input id="pDob" type="date"></div>
+          <div><label for="pSex">Sex (optional)</label><select id="pSex"><option value="">Not recorded</option><option>Female</option><option>Male</option><option>Other</option><option>Prefer not to say</option></select></div>
+          <div><label for="pPhone">Phone number</label><input id="pPhone" inputmode="tel" maxlength="25"></div>
+          <div><label for="pId">Clinic patient ID (optional)</label><input id="pId" maxlength="40" placeholder="Leave blank to auto-generate"></div>
+        </div>
+        <label for="pAllergies">Allergies / important alerts</label><textarea id="pAllergies" maxlength="1500"></textarea>
+        <label for="pHistory">Relevant medical history</label><textarea id="pHistory" maxlength="3000"></textarea>
+        <div class="row"><button type="submit">Save patient</button><button type="reset" class="secondary">Clear form</button></div>
+      </form>
+    </div>
+  </section>
+  <section id="backupTab" class="tabPanel hidden">
+    <div class="card">
+      <h2>Encrypted backup</h2>
+      <p class="muted">Export a password-encrypted file and save it somewhere secure, such as an encrypted USB drive or trusted private storage. Keep the backup password separately.</p>
+      <button id="exportBtn">Export encrypted backup</button>
+      <hr>
+      <h3>Restore backup</h3>
+      <p class="muted">Restoring replaces the current database. Export a backup of your current data first if you need to keep it.</p>
+      <label for="backupFile">Choose backup file</label><input type="file" id="backupFile" accept=".lpr,.json,application/json">
+      <label for="backupPass">Backup password</label><input id="backupPass" type="password" autocomplete="off">
+      <button id="restoreBtn" class="secondary">Restore and replace records</button>
+      <hr>
+      <h3>Lock app</h3><button id="lockBtn" class="secondary">Lock records</button>
+      <p class="muted small">This prototype does not sync records between devices. A backup is a copy, not live synchronisation.</p>
+    </div>
+  </section>
+</div>
+<div id="status" role="status" aria-live="polite"></div>
+<footer class="muted small" style="padding:0 4px 20px">Local Patient Records prototype · No analytics or network requests are built into this file.</footer>
+</main>
+<script>
+(() => {
+'use strict';
+const DB_NAME='local-patient-records-v1', STORE='vault', VAULT_KEY='main';
+let db=null, cryptoKey=null, data={patients:[],visits:[]}, selectedId=null, isNewVault=false;
+const $=id=>document.getElementById(id);
+function status(msg, bad=false){$('status').textContent=msg;$('status').className=bad?'error':''}
+function uid(prefix){return prefix+'-'+Date.now().toString(36).toUpperCase()+'-'+crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase().slice(0,5)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmtDate(s){if(!s)return 'Not recorded';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString()}
+function today(){return new Date().toISOString().slice(0,10)}
+function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>req.result.createObjectStore(STORE);req.onsuccess=()=>{db=req.result;resolve()};req.onerror=()=>reject(req.error)})}
+function getVault(){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),r=tx.objectStore(STORE).get(VAULT_KEY);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}
+function putVault(v){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,VAULT_KEY);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
+function delVault(){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(VAULT_KEY);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
+function b64(buf){let s='';new Uint8Array(buf).forEach(b=>s+=String.fromCharCode(b));return btoa(s)}
+function unb64(s){const x=atob(s);return Uint8Array.from(x,c=>c.charCodeAt(0))}
+async function derive(pass,salt){const material=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function encryptObject(obj,pass){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await derive(pass,salt),plain=new TextEncoder().encode(JSON.stringify(obj)),cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,plain);return {format:'LPR-ENCRYPTED-1',salt:b64(salt),iv:b64(iv),ciphertext:b64(cipher),kdf:'PBKDF2-SHA-256-310000',cipher:'AES-256-GCM'}}
+async function decryptObject(blob,pass){if(!blob||blob.format!=='LPR-ENCRYPTED-1')throw Error('Unsupported backup/database format.');const key=await derive(pass,unb64(blob.salt));const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(blob.iv)},key,unb64(blob.ciphertext));return JSON.parse(new TextDecoder().decode(plain))}
+async function persist(){const blob=await encryptObject(data,$('passphrase').value);await putVault(blob)}
+function setUnlocked(on){$('lockScreen').classList.toggle('hidden',on);$('app').classList.toggle('hidden',!on);if(on){renderPatients();status('Records unlocked.')}else{data={patients:[],visits:[]};selectedId=null;cryptoKey=null;$('passphrase').value='';$('confirmPass').value='';status('App locked.')} }
+async function startUnlock(){const pass=$('passphrase').value; if(pass.length<12){status('Use at least 12 characters for the app password.',true);return}
+try{await openDB();const existing=await getVault();if(!existing){if($('confirmWrap').classList.contains('hidden')){$('confirmWrap').classList.remove('hidden');$('unlockBtn').textContent='Confirm and create database';status('Enter the same password in both fields.');return}if(pass!==$('confirmPass').value){status('Passwords do not match.',true);return}data={patients:[],visits:[]};await persist();setUnlocked(true);status('New encrypted database created. Make an encrypted backup regularly.');return}
+data=await decryptObject(existing,pass);if(!Array.isArray(data.patients)||!Array.isArray(data.visits))throw Error('Database format is invalid.');$('confirmWrap').classList.add('hidden');$('unlockBtn').textContent='Unlock records';setUnlocked(true)
+}catch(e){console.error(e);status('Could not unlock/create records. Check the password or browser storage. '+(e.name==='OperationError'?'Wrong password or damaged data.':e.message),true)}}
+$('unlockBtn').addEventListener('click',startUnlock);
+$('passphrase').addEventListener('input',()=>{if($('confirmWrap').classList.contains('hidden')){$('unlockBtn').textContent='Unlock records'}})
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b===btn);b.classList.toggle('secondary',b!==btn)});document.querySelectorAll('.tabPanel').forEach(p=>p.classList.toggle('hidden',p.id!==btn.dataset.tab));if(btn.dataset.tab==='patientsTab')renderPatients()}));
+$('patientForm').addEventListener('submit',async e=>{e.preventDefault();const name=$('pName').value.trim();if(!name)return;const customId=$('pId').value.trim();if(customId&&data.patients.some(p=>p.patientCode.toLowerCase()===customId.toLowerCase())){status('That patient ID already exists. Choose a unique ID.',true);return}
+const p={id:uid('PAT'),patientCode:customId||uid('P'),name,dob:$('pDob').value,sex:$('pSex').value,phone:$('pPhone').value.trim(),allergies:$('pAllergies').value.trim(),history:$('pHistory').value.trim(),createdAt:new Date().toISOString()};data.patients.unshift(p);try{await persist();$('patientForm').reset();$('pId').value='';selectedId=p.id;showTab('patientsTab');renderPatients();renderDetail(p.id);status('Patient saved locally.')}catch(err){data.patients=data.patients.filter(x=>x.id!==p.id);status('Save failed: '+err.message,true)}});
+function showTab(id){document.querySelector(`[data-tab="${id}"]`).click()}
+$('search').addEventListener('input',renderPatients);
+function renderPatients(){const q=($('search').value||'').trim().toLowerCase(),list=data.patients.filter(p=>[p.name,p.patientCode,p.phone].some(v=>(v||'').toLowerCase().includes(q)));$('patientList').innerHTML=list.length?list.map(p=>`<div class="item"><div class="row" style="align-items:center"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.patientCode)} · ${esc(p.phone||'No phone')}</p></div><button class="secondary" data-open="${esc(p.id)}">Open record</button></div></div>`).join(''):'<div class="empty">No patients found. Add a patient to get started.</div>';document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{selectedId=b.dataset.open;renderDetail(selectedId)}));if(selectedId&&data.patients.some(p=>p.id===selectedId))renderDetail(selectedId)}
+function renderDetail(id){const p=data.patients.find(x=>x.id===id);if(!p){$('patientDetail').innerHTML='';return}const visits=data.visits.filter(v=>v.patientId===id).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));$('patientDetail').innerHTML=`<div class="card"><h2>${esc(p.name)}</h2><div class="tag">${esc(p.patientCode)}</div><p><b>DOB:</b> ${esc(fmtDate(p.dob))} · <b>Sex:</b> ${esc(p.sex||'Not recorded')}</p><p><b>Phone:</b> ${esc(p.phone||'Not recorded')}</p><p><b>Allergies / alerts:</b><br>${esc(p.allergies||'Not recorded').replace(/\\n/g,'<br>')}</p><p><b>Medical history:</b><br>${esc(p.history||'Not recorded').replace(/\\n/g,'<br>')}</p><div class="row"><button data-edit="${esc(p.id)}" class="secondary">Edit patient</button><button data-addvisit="${esc(p.id)}">Add visit</button></div><div id="editPatientForm" class="hidden"></div></div><div class="card"><h2>Visit history (${visits.length})</h2><div id="visitForm" class="hidden"></div>${visits.length?visits.map(v=>`<div class="item"><h3>${esc(fmtDate(v.date))}</h3><p><b>Diagnosis / reason:</b> ${esc(v.diagnosis||'Not recorded')}</p>${v.notes?`<p><b>Notes:</b> ${esc(v.notes)}</p>`:''}<h3>Medicines</h3>${v.medicines.length?v.medicines.map(m=>`<p><b>${esc(m.name)}</b>${m.strength?' · '+esc(m.strength):''}<br><span class="muted">${esc(m.dose||'Dose not recorded')} · ${esc(m.frequency||'Frequency not recorded')} · ${esc(m.duration||'Duration not recorded')}</span>${m.instructions?`<br>${esc(m.instructions)}`:''}</p>`).join(''):'<p class="muted">No medicines recorded.</p>'}<p class="muted small">Saved ${esc(new Date(v.createdAt).toLocaleString())}</p><button class="secondary" data-viewvisit="${esc(v.id)}">View / edit visit</button></div>`).join(''):'<div class="empty">No visits recorded yet.</div>'}</div>`;
+document.querySelector('[data-addvisit]').addEventListener('click',()=>visitForm(id));
+document.querySelector('[data-edit]').addEventListener('click',()=>editPatient(id));
+document.querySelectorAll('[data-viewvisit]').forEach(b=>b.addEventListener('click',()=>visitForm(id,b.dataset.viewvisit)));
+}
+function editPatient(id){const p=data.patients.find(x=>x.id===id),el=$('editPatientForm');el.classList.remove('hidden');el.innerHTML=`<hr><h3>Edit patient details</h3><label>Name *</label><input id="eName" value="${esc(p.name)}"><div class="grid"><div><label>Date of birth</label><input id="eDob" type="date" value="${esc(p.dob)}"></div><div><label>Sex</label><select id="eSex">${['','Female','Male','Other','Prefer not to say'].map(s=>`<option ${p.sex===s?'selected':''} value="${esc(s)}">${esc(s||'Not recorded')}</option>`).join('')}</select></div><div class="full"><label>Phone</label><input id="ePhone" value="${esc(p.phone)}"></div></div><label>Allergies / alerts</label><textarea id="eAllergies">${esc(p.allergies)}</textarea><label>Medical history</label><textarea id="eHistory">${esc(p.history)}</textarea><div class="row"><button id="saveEdit">Save changes</button><button id="cancelEdit" class="secondary">Cancel</button></div>`;$('cancelEdit').onclick=()=>el.classList.add('hidden');$('saveEdit').onclick=async()=>{if(!$('eName').value.trim()){status('Name is required.',true);return}Object.assign(p,{name:$('eName').value.trim(),dob:$('eDob').value,sex:$('eSex').value,phone:$('ePhone').value.trim(),allergies:$('eAllergies').value.trim(),history:$('eHistory').value.trim()});try{await persist();renderPatients();renderDetail(id);status('Patient details updated.')}catch(e){status('Could not save changes: '+e.message,true)}}}
+function visitForm(patientId,visitId){const existing=visitId?data.visits.find(v=>v.id===visitId):null,visit=existing||{id:uid('VIS'),patientId,date:today(),diagnosis:'',notes:'',medicines:[],createdAt:new Date().toISOString()};let meds=JSON.parse(JSON.stringify(visit.medicines||[]));const el=$('visitForm');el.classList.remove('hidden');function draw(){el.innerHTML=`<div class="item"><h3>${existing?'Edit visit':'New visit'}</h3><label>Visit date *</label><input id="vDate" type="date" value="${esc(visit.date)}" required><label>Diagnosis / reason for visit</label><textarea id="vDiagnosis" maxlength="3000">${esc(visit.diagnosis)}</textarea><label>Clinical notes / advice</label><textarea id="vNotes" maxlength="5000">${esc(visit.notes)}</textarea><hr><h3>Medicines</h3><div id="medList">${meds.map((m,i)=>`<div class="item"><p><b>${esc(m.name)}</b> ${esc(m.strength||'')}</p><p class="muted">${esc(m.dose||'')} · ${esc(m.frequency||'')} · ${esc(m.duration||'')}</p><button type="button" class="danger" data-delmed="${i}">Remove medicine</button></div>`).join('')||'<p class="muted">No medicines added.</p>'}</div><div class="item"><h3>Add a medicine</h3><label>Medicine name *</label><input id="mName" maxlength="160" placeholder="Generic or brand name"><div class="grid"><div><label>Strength</label><input id="mStrength" maxlength="80" placeholder="e.g. 500 mg"></div><div><label>Dose</label><input id="mDose" maxlength="100" placeholder="e.g. 1 tablet"></div><div><label>Frequency</label><input id="mFrequency" maxlength="100" placeholder="e.g. twice daily"></div><div><label>Duration</label><input id="mDuration" maxlength="100" placeholder="e.g. 5 days"></div><div class="full"><label>Instructions / route</label><input id="mInstructions" maxlength="300" placeholder="e.g. oral, after food"></div></div><button type="button" id="addMed" class="secondary">Add medicine to visit</button></div><div class="row"><button type="button" id="saveVisit">Save visit</button><button type="button" id="cancelVisit" class="secondary">Cancel</button></div></div>`;document.querySelectorAll('[data-delmed]').forEach(b=>b.onclick=()=>{meds.splice(Number(b.dataset.delmed),1);draw()});$('addMed').onclick=()=>{const name=$('mName').value.trim();if(!name){status('Enter a medicine name first.',true);return}meds.push({name,strength:$('mStrength').value.trim(),dose:$('mDose').value.trim(),frequency:$('mFrequency').value.trim(),duration:$('mDuration').value.trim(),instructions:$('mInstructions').value.trim()});draw();status('Medicine added to the visit form; save the visit to keep it.')};$('cancelVisit').onclick=()=>el.classList.add('hidden');$('saveVisit').onclick=async()=>{if(!$('vDate').value){status('Visit date is required.',true);return}Object.assign(visit,{date:$('vDate').value,diagnosis:$('vDiagnosis').value.trim(),notes:$('vNotes').value.trim(),medicines:meds,updatedAt:new Date().toISOString()});const idx=data.visits.findIndex(v=>v.id===visit.id);if(idx>=0)data.visits[idx]=visit;else data.visits.push(visit);try{await persist();renderDetail(patientId);status('Visit saved locally.')}catch(e){status('Could not save visit: '+e.message,true)}}}draw()}
+$('exportBtn').addEventListener('click',async()=>{try{const pass=prompt('Enter a strong password for this backup. Keep it safe; it cannot be recovered.');if(!pass||pass.length<12){status('Backup cancelled. Use at least 12 characters.',true);return}const blob=await encryptObject({schema:1,exportedAt:new Date().toISOString(),data},pass),file=new Blob([JSON.stringify(blob)],{type:'application/json'}),url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download='patient-records-encrypted-'+today()+'.lpr';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Encrypted backup created. Check your Downloads folder and move it to a secure location.')}catch(e){status('Backup failed: '+e.message,true)}});
+$('restoreBtn').addEventListener('click',async()=>{const file=$('backupFile').files[0],pass=$('backupPass').value;if(!file||!pass){status('Choose a backup file and enter its password.',true);return}if(!confirm('This replaces all records currently in this app. Export a backup first. Continue?'))return;try{const blob=JSON.parse(await file.text()),decoded=await decryptObject(blob,pass),restored=decoded.data||decoded;if(!Array.isArray(restored.patients)||!Array.isArray(restored.visits))throw Error('Backup does not contain valid patient records.');const checkPatients=new Set(restored.patients.map(p=>p.id));if(restored.visits.some(v=>!checkPatients.has(v.patientId)))throw Error('Backup has visits with missing patient records.');const old=data;data=restored;try{await persist()}catch(e){data=old;throw e}selectedId=null;$('backupPass').value='';renderPatients();$('patientDetail').innerHTML='';status('Backup restored successfully.')}catch(e){status('Restore failed. Check the file and password. '+e.message,true)}});
+$('lockBtn').addEventListener('click',()=>setUnlocked(false));
+if(!window.crypto||!crypto.subtle||!window.indexedDB){$('unlockBtn').disabled=true;status('This browser does not support required secure storage/encryption. Use an up-to-date Android browser.',true)}
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch((err) => {
+      console.warn('Offline app setup could not be completed:', err);
+    });
+  });
+}
+</script>
+
+</body>
+</html>
