@@ -1,4 +1,4 @@
-const CACHE_NAME = 'local-patient-records-v3-rxphoto';
+const CACHE_NAME = 'local-patient-records-v4-delete-rxphoto';
 const APP_FILES = [
   './',
   './index.html',
