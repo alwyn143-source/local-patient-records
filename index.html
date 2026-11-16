@@ -40,6 +40,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}.rxThumbs{display:fle
   <div class="notice"><b>Prototype warning:</b> test with fictional patients first. This is not certified clinical software. Records are encrypted in this app's browser storage, but the phone's browser profile and device must also be secured.</div>
   <div class="tabs">
     <button class="active" data-tab="patientsTab">Patients</button>
+    <button class="secondary" data-tab="consultTab">Consult</button>
     <button class="secondary" data-tab="addTab">Add patient</button>
     <button class="secondary" data-tab="backupTab">Backup</button>
   </div>
@@ -67,6 +68,38 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}.rxThumbs{display:fle
         <label for="pAllergies">Allergies / important alerts</label><textarea id="pAllergies" maxlength="1500"></textarea>
         <label for="pHistory">Relevant medical history</label><textarea id="pHistory" maxlength="3000"></textarea>
         <div class="row"><button type="submit">Save patient</button><button type="reset" class="secondary">Clear form</button></div>
+      </form>
+    </div>
+  </section>
+  <section id="consultTab" class="tabPanel hidden">
+    <div class="card">
+      <h2>Doctor’s fast consultation</h2>
+      <p class="muted">Register a new patient and record the first visit on one screen. Use your phone keyboard’s microphone for dictation if available.</p>
+      <form id="fastConsultForm">
+        <h3>Patient details</h3>
+        <div class="grid">
+          <div><label for="fcFirst">First name *</label><input id="fcFirst" required maxlength="80" autocomplete="given-name"></div>
+          <div><label for="fcLast">Last name</label><input id="fcLast" maxlength="80" autocomplete="family-name"></div>
+          <div><label for="fcAge">Age *</label><input id="fcAge" type="number" min="0" max="130" inputmode="numeric" required></div>
+          <div><label for="fcPhone">Phone number</label><input id="fcPhone" inputmode="tel" maxlength="25" autocomplete="tel"></div>
+          <div class="full"><label for="fcLocation">Location</label><input id="fcLocation" maxlength="200"></div>
+        </div>
+        <hr><h3>Consultation</h3>
+        <label for="fcDate">Visit date *</label><input id="fcDate" type="date" required>
+        <label for="fcDiagnosis">Diagnosis / reason for visit</label><textarea id="fcDiagnosis" maxlength="3000" placeholder="Enter your clinical assessment"></textarea>
+        <label for="fcNotes">Clinical notes / advice</label><textarea id="fcNotes" maxlength="5000" placeholder="Type or use your mobile keyboard’s voice typing"></textarea>
+        <hr><h3>Medicine (optional)</h3>
+        <label for="fcMedicine">Medicine name</label><input id="fcMedicine" maxlength="160">
+        <div class="grid">
+          <div><label for="fcStrength">Strength</label><input id="fcStrength" maxlength="80"></div>
+          <div><label for="fcDose">Dose</label><input id="fcDose" maxlength="100"></div>
+          <div><label for="fcFrequency">Frequency</label><input id="fcFrequency" maxlength="100"></div>
+          <div><label for="fcDuration">Duration</label><input id="fcDuration" maxlength="100"></div>
+          <div class="full"><label for="fcInstructions">Instructions / route</label><input id="fcInstructions" maxlength="300"></div>
+        </div>
+        <label for="fcPhoto">Prescription photo (optional)</label><input id="fcPhoto" type="file" accept="image/*" capture="environment">
+        <p class="muted small">Review all clinical details and prescriptions before saving. This tool does not make clinical decisions.</p>
+        <div class="row"><button type="submit" id="fcSaveNext">Save consultation & next patient</button><button type="button" id="fcSaveOpen" class="secondary">Save & open record</button></div>
       </form>
     </div>
   </section>
@@ -100,7 +133,7 @@ function status(msg, bad=false){$('status').textContent=msg;$('status').classNam
 function uid(prefix){return prefix+'-'+Date.now().toString(36).toUpperCase()+'-'+crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase().slice(0,5)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmtDate(s){if(!s)return 'Not recorded';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString()}
-function today(){return new Date().toISOString().slice(0,10)}
+function today(){const d=new Date();const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>req.result.createObjectStore(STORE);req.onsuccess=()=>{db=req.result;resolve()};req.onerror=()=>reject(req.error)})}
 function getVault(){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),r=tx.objectStore(STORE).get(VAULT_KEY);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}
 function putVault(v){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,VAULT_KEY);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
@@ -203,6 +236,39 @@ function visitForm(patientId,visitId){
   }
   draw();
 }
+// Fast consultation: one encrypted save for the new patient and their first visit.
+function clearFastConsult(){
+  $('fastConsultForm').reset();
+  $('fcDate').value=today();
+  $('fcFirst').focus();
+}
+async function saveFastConsult(openRecord){
+  const firstName=$('fcFirst').value.trim(), lastName=$('fcLast').value.trim();
+  const age=Number($('fcAge').value);
+  if(!firstName){status('First name is required.',true);$('fcFirst').focus();return}
+  if($('fcAge').value===''||!Number.isInteger(age)||age<0||age>130){status('Enter a valid age.',true);$('fcAge').focus();return}
+  if(!$('fcDate').value){status('Visit date is required.',true);return}
+  const name=[firstName,lastName].filter(Boolean).join(' ');
+  const patient={id:uid('PAT'),patientCode:uid('P'),name,firstName,lastName,age,phone:$('fcPhone').value.trim(),location:$('fcLocation').value.trim(),allergies:'',history:'',createdAt:new Date().toISOString()};
+  const medicineName=$('fcMedicine').value.trim();
+  const medicines=medicineName?[{name:medicineName,strength:$('fcStrength').value.trim(),dose:$('fcDose').value.trim(),frequency:$('fcFrequency').value.trim(),duration:$('fcDuration').value.trim(),instructions:$('fcInstructions').value.trim()}]:[];
+  const visit={id:uid('VIS'),patientId:patient.id,date:$('fcDate').value,diagnosis:$('fcDiagnosis').value.trim(),notes:$('fcNotes').value.trim(),medicines,prescriptionPhotos:[],createdAt:new Date().toISOString()};
+  const photoFile=$('fcPhoto').files[0];
+  const btn=$('fcSaveNext');btn.disabled=true;$('fcSaveOpen').disabled=true;
+  try{
+    if(photoFile){const photoData=await compressPhoto(photoFile);visit.prescriptionPhotos.push({id:uid('RX'),data:photoData,createdAt:new Date().toISOString()});}
+    data.patients.unshift(patient);data.visits.push(visit);
+    try{await persist()}catch(err){data.patients=data.patients.filter(p=>p.id!==patient.id);data.visits=data.visits.filter(v=>v.id!==visit.id);throw err}
+    selectedId=patient.id;
+    if(openRecord){clearFastConsult();showTab('patientsTab');renderPatients();renderDetail(patient.id);status('Patient and first consultation saved locally.')}
+    else{clearFastConsult();status('Consultation saved. Ready for the next patient.')}
+  }catch(err){status('Could not save consultation: '+err.message,true)}
+  finally{btn.disabled=false;$('fcSaveOpen').disabled=false}
+}
+$('fastConsultForm').addEventListener('submit',e=>{e.preventDefault();saveFastConsult(false)});
+$('fcSaveOpen').addEventListener('click',()=>saveFastConsult(true));
+$('fcDate').value=today();
+
 $('exportBtn').addEventListener('click',async()=>{try{const pass=prompt('Enter a strong password for this backup. Keep it safe; it cannot be recovered.');if(!pass||pass.length<12){status('Backup cancelled. Use at least 12 characters.',true);return}const blob=await encryptObject({schema:1,exportedAt:new Date().toISOString(),data},pass),file=new Blob([JSON.stringify(blob)],{type:'application/json'}),url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download='patient-records-encrypted-'+today()+'.lpr';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Encrypted backup created. Check your Downloads folder and move it to a secure location.')}catch(e){status('Backup failed: '+e.message,true)}});
 $('restoreBtn').addEventListener('click',async()=>{const file=$('backupFile').files[0],pass=$('backupPass').value;if(!file||!pass){status('Choose a backup file and enter its password.',true);return}if(!confirm('This replaces all records currently in this app. Export a backup first. Continue?'))return;try{const blob=JSON.parse(await file.text()),decoded=await decryptObject(blob,pass),restored=decoded.data||decoded;if(!Array.isArray(restored.patients)||!Array.isArray(restored.visits))throw Error('Backup does not contain valid patient records.');const checkPatients=new Set(restored.patients.map(p=>p.id));if(restored.visits.some(v=>!checkPatients.has(v.patientId)))throw Error('Backup has visits with missing patient records.');const old=data;data=restored;try{await persist()}catch(e){data=old;throw e}selectedId=null;$('backupPass').value='';renderPatients();$('patientDetail').innerHTML='';status('Backup restored successfully.')}catch(e){status('Restore failed. Check the file and password. '+e.message,true)}});
 $('lockBtn').addEventListener('click',()=>setUnlocked(false));
